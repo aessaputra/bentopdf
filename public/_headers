@@ -1,0 +1,26 @@
+# Required security headers for SharedArrayBuffer (used by LibreOffice WASM)
+/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: cross-origin
+
+# Pre-compressed LibreOffice WASM binary
+/libreoffice-wasm/soffice.wasm.gz
+  Content-Type: application/wasm
+  Content-Encoding: gzip
+  Cache-Control: public, max-age=31536000, immutable
+
+# Pre-compressed LibreOffice WASM data
+/libreoffice-wasm/soffice.data.gz
+  Content-Type: application/octet-stream
+  Content-Encoding: gzip
+  Cache-Control: public, max-age=31536000, immutable
+
+# Cache WASM files aggressively
+/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: application/wasm
+
+# Service worker
+/sw.js
+  Cache-Control: no-cache
