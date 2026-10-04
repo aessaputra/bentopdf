@@ -10,12 +10,12 @@
 
 ## Build Configuration
 
-| Setting                | Value           |
-| ---------------------- | --------------- |
-| Framework preset       | None            |
+| Setting                | Value                      |
+| ---------------------- | -------------------------- |
+| Framework preset       | None                       |
 | Build command          | `npm run build:cloudflare` |
-| Build output directory | `dist`          |
-| Root directory         | `/`             |
+| Build output directory | `dist`                     |
+| Root directory         | `/`                        |
 
 ## Environment Variables
 
@@ -24,7 +24,7 @@ Add these in Settings → Environment variables:
 | Variable                | Value                                      |
 | ----------------------- | ------------------------------------------ |
 | `NODE_VERSION`          | `22`                                       |
-| `SIMPLE_MODE`           | `true` (optional)                         |
+| `SIMPLE_MODE`           | `true` (optional)                          |
 | `VITE_BRAND_NAME`       | Custom brand name (optional)               |
 | `VITE_BRAND_LOGO`       | Logo path relative to `public/` (optional) |
 | `VITE_FOOTER_TEXT`      | Custom footer/copyright text (optional)    |
@@ -41,13 +41,17 @@ Add these in Settings → Environment variables:
    shown in the dashboard). Do not use `VITE_` prefixes or commit credentials.
 4. Build with `npm run build:cloudflare`, output `dist`. The original
    `npm run build` and Node configuration files are unchanged. Root `BASE_URL=/`
-   is required for this Pages route. The build image needs curl 7.75+ for native
-   AWS SigV4 (`--aws-sigv4`); fail the build if it is unavailable.
+   is required for this Pages route. Install dev dependencies for the build
+   (`npm ci --include=dev`); uploads use the official `@aws-sdk/client-s3`
+   Node SDK, not the build image's curl.
 
 The post-build script hashes the complete `dist/libreoffice-wasm` file set and
 uploads each file via signed S3 PUT to `libreoffice-wasm/<sha256-version>/<file>`.
 It streams hashes/uploads rather than loading the WASM into memory, sends
-Content-MD5 for integrity, and preserves MIME and gzip/Brotli metadata.
+Content-MD5 and the precomputed SHA256 payload hash for integrity, and preserves
+MIME and gzip/Brotli metadata. The SDK uses region `auto`, path-style bucket
+addressing, and `requestChecksumCalculation: 'WHEN_REQUIRED'` to avoid automatic
+CRC/chunked trailers while retaining these explicit checksums.
 Only after **every upload succeeds** does it generate
 `cloudflare/libreoffice-assets.generated.js`, write `dist/_routes.json`, and
 remove `dist/libreoffice-wasm`. Any failed upload exits nonzero and leaves local
@@ -81,10 +85,13 @@ remote R2 access; confirm those in the first Pages build, then GET/HEAD all five
 loader assets and perform a document conversion on its deployment URL.
 
 Official references:
+
 - [Pages R2 storage and dashboard binding](https://developers.cloudflare.com/pages/tutorials/use-r2-as-static-asset-storage-for-pages/)
 - [Pages Function routes and `_routes.json`](https://developers.cloudflare.com/pages/functions/routing/)
 - [Pages headers: static responses only](https://developers.cloudflare.com/pages/configuration/headers/)
 - [Pages redirects: not applied to Functions](https://developers.cloudflare.com/pages/configuration/redirects/)
+- [R2 official AWS SDK v3 example](https://developers.cloudflare.com/r2/examples/aws/aws-sdk-js-v3/)
+- [AWS SDK checksum configuration](https://docs.aws.amazon.com/sdkref/latest/guide/feature-dataintegrity.html)
 - [R2 S3 PUT metadata and region `auto`](https://developers.cloudflare.com/r2/api/s3/api/)
 - [R2 get/head and HTTP metadata](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/)
 
