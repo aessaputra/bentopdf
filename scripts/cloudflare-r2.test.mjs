@@ -138,7 +138,7 @@ test('oversized remaining Pages file blocks upload and preserves LibreOffice', a
 
 test('upload failure preserves all LibreOffice assets and deployment mapping', async () => {
   const root = await mkdtemp(join(tmpdir(), 'bentopdf-r2-'));
-  const server = createServer((req, res) => { req.resume(); res.writeHead(403); res.end('denied'); });
+  const server = createServer((req, res) => { req.resume(); res.writeHead(403); res.end('<Error><Code>SignatureDoesNotMatch</Code><Message>local-test-secret</Message><Signature>private-signature</Signature></Error>'); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
     await mkdir(join(root, 'dist/libreoffice-wasm'), { recursive: true });
@@ -146,9 +146,22 @@ test('upload failure preserves all LibreOffice assets and deployment mapping', a
     await writeFile(join(root, 'dist/libreoffice-wasm/soffice.js'), 'test script');
     await writeFile(join(root, 'cloudflare/libreoffice-assets.generated.js'), 'old mapping');
     const result = await run(root, `http://127.0.0.1:${server.address().port}`);
-    assert.match(result.output, /R2 upload failed.*403/);
+    assert.match(result.output, /R2 upload failed.*HTTP 403 \(SignatureDoesNotMatch\)/);
+    assert.doesNotMatch(result.output, /local-test-key|local-test-secret|private-signature|<Error>/);
     assert.notEqual(result.code, 0);
     assert.equal(await readFile(join(root, 'dist/libreoffice-wasm/soffice.js'), 'utf8'), 'test script');
     assert.equal(await readFile(join(root, 'cloudflare/libreoffice-assets.generated.js'), 'utf8'), 'old mapping');
+    server.removeAllListeners('request');
+    server.on('request', (req, res) => { req.resume(); res.writeHead(403); res.end('<Error><Code>PrivateSecretValue</Code><Message>local-test-secret</Message></Error>' + 'x'.repeat(10000)); });
+    const unknown = await run(root, `http://127.0.0.1:${server.address().port}`);
+    assert.notEqual(unknown.code, 0);
+    assert.match(unknown.output, /HTTP 403\n/);
+    assert.doesNotMatch(unknown.output, /PrivateSecretValue|local-test-secret|<Error>/);
+    server.removeAllListeners('request');
+    server.on('request', (req, res) => { req.resume(); res.writeHead(403); res.end('denied'); });
+    const plain = await run(root, `http://127.0.0.1:${server.address().port}`);
+    assert.notEqual(plain.code, 0);
+    assert.match(plain.output, /HTTP 403\n/);
+    assert.doesNotMatch(plain.output, /denied/);
   } finally { server.close(); await rm(root, { recursive: true, force: true }); }
 });

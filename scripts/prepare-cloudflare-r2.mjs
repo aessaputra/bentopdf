@@ -74,12 +74,25 @@ try {
     await new Promise((resolve, reject) => {
       const child = spawn('curl', ['--config', '-', '--aws-sigv4', 'aws:amz:auto:s3', '--silent', '--show-error',
         '--connect-timeout', '30', '--max-time', '900', '--upload-file', join(assetsDir, file.name),
-        '--output', '/dev/null', '--write-out', '%{http_code}', url], { stdio: ['pipe', 'pipe', 'pipe'] });
-      let status = '';
-      child.stdout.on('data', data => status += data);
+        '--write-out', '\nR2_HTTP_STATUS:%{http_code}', url], { stdio: ['pipe', 'pipe', 'pipe'] });
+      let response = '';
+      let tail = '';
+      child.stdout.on('data', data => {
+        const text = data.toString();
+        response = (response + text).slice(0, 8192);
+        tail = (tail + text).slice(-64);
+      });
       child.stderr.resume();
       child.on('error', reject);
-      child.on('close', code => code === 0 && /^2\d\d$/.test(status) ? resolve() : reject(new Error(`R2 upload failed for ${file.name}: HTTP ${status || 'network error'}`)));
+      child.on('close', code => {
+        const status = tail.match(/\nR2_HTTP_STATUS:(\d{3})$/)?.[1];
+        if (code === 0 && status && /^2\d\d$/.test(status)) return resolve();
+        const errorCode = response.match(/<Code>([A-Za-z]+)<\/Code>/)?.[1];
+        // Only known S3 error codes are safe to log; never print the response or Message.
+        const safeCodes = ['AccessDenied', 'InvalidAccessKeyId', 'SignatureDoesNotMatch', 'RequestTimeTooSkewed', 'RequestExpired', 'ExpiredToken', 'InvalidToken', 'NoSuchBucket', 'AuthorizationHeaderMalformed', 'InvalidArgument', 'InvalidRequest', 'BadDigest', 'InternalError', 'ServiceUnavailable', 'SlowDown'];
+        const detail = safeCodes.includes(errorCode) ? ` (${errorCode})` : '';
+        reject(new Error(`R2 upload failed for ${file.name}: HTTP ${status || 'network error'}${detail}`));
+      });
       child.stdin.on('error', () => {});
       child.stdin.end(config);
     });
