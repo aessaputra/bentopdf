@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+cloudflare/libreoffice-assets.generated.js
 *.local
 .npm-cache
 .env
