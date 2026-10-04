@@ -28,7 +28,7 @@ const ALLOWED_TSA_HOSTS = new Set([
   'tsa.mesign.com',
 ]);
 
-const ALLOWED_ORIGINS = ['https://www.bentopdf.com', 'https://bentopdf.com'];
+const ALLOWED_ORIGINS = ['https://pdf.aes.my.id'];
 
 const SAFE_CONTENT_TYPES = [
   'application/x-x509-ca-cert',
